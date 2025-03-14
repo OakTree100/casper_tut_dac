@@ -189,8 +189,8 @@ you can run in ipython with ``run sine.py``
   tau = dt * num_vals # Time length of bram 
   
   # Useful info if running as a script
-  print(f"fs = {fs}")
-  print(f"fc = {fc}")
+  print(f"fs = {fs / 1e6} MHz")
+  print(f"fc = {fc / 1e6} MHz")
   
   # Setup our array
   t = np.arange(0,tau,dt)
