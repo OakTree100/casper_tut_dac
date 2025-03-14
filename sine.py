@@ -14,9 +14,9 @@ fc = 393.216e6      # Carrier frequency
 dt = 1/fs           # Time length between samples
 tau = dt * num_vals # Time length of bram 
 
-# Useful info if running from a script
-print(f"fs = {fs}")
-print(f"fc = {fc}")
+# Useful info if running as a script
+print(f"fs = {fs / 1e6} MHz")
+print(f"fc = {fc / 1e6} MHz")
 
 # Setup our array
 t = np.arange(0,tau,dt)
