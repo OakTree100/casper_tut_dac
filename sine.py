@@ -26,7 +26,7 @@ if (False):
 t = np.arange(0,tau,dt)
 print('Expected ' + str(num_vals) + ' values. Got ' + str(len(t)))
 
-x = 0.5*(1+np.cos(2*np.pi*(fc/fs*2000e6)*t))
+x = 0.5*(1+np.cos(2*np.pi* fc *t))
 maxVal = 2**13-1
 x *= maxVal
 x = np.round(np.short(x))
