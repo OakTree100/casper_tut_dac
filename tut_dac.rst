@@ -1,8 +1,8 @@
 Tutorial 2.5: The RFDC DAC Interface
-==================================
+====================================
 
 Introduction
--------------
+------------
 In the previous tutorial we introduced the RFDC Yellow block, with configurations
 for the dual- and quad-tile RFSoCs with ADCs. It it worth providing a brief
 introduction to the DAC interface. This tutorial assumes you have completed through
@@ -12,7 +12,6 @@ The Example Design
 --------------------
 In this example we will configure the RFDC for a dual-tile RFSoC4x2 board.
 
-......
 This design will:
   * Set sample rates
   * Use the internal PLLs to generate the sample clock
@@ -32,9 +31,10 @@ You'll need all these pieces
  * System Generator
  * RFSoC 4x2 block
  * RFDC
- * dac_en software register
+ * enable software register
  * bram
  * munge
+ * counter
 
 First, add your ``System Generator`` and ``RFSoC 4x2`` block. 
 
@@ -43,11 +43,12 @@ First, add your ``System Generator`` and ``RFSoC 4x2`` block.
   # RFSoC4x2
   User IP Clock Rate: 245.76, RFPLL PL Clock Rate: 491.52
 
-Add a ``rfdc`` block. Double click on it, and disable all
-available ADCs. Only enable the first DAC tile (228), and only
-enable the DAC 0. Your ``Required AXI4-Stream Clock (MHz)``
-should be 245.76
-Configure the DAC as follows:
+Add yout ``rfdc``
+^^^^^^^^^^^^^^^^^
+Double click on it, and disable all
+available ADCs. Enable the first and second DAC tiles (228, 229), and only
+enable the DAC 0 in either. Your ``Required AXI4-Stream Clock (MHz)`` should be 245.76
+Configure the DAC tiles as follows:
 
 .. code:: bash
 
@@ -72,12 +73,98 @@ Configure the DAC as follows:
 
 .. image:: dac_config.png
 
-Setup your ``bram`` to have a // *******************************************
-Setup a counter to loop through your bram. The 
+Add your ``bram``
+^^^^^^^^^^^^^^^^^
+Connect the ``we`` port of the 
+bram to a Xilinx 0 constant. Connect the ``data_in``
+port to a Xilinx 0 constant. This will prevent the bram
+from being loaded from the fabric, requiring us to load it with software.
+
+.. code:: bash
+
+  Output Data Type          - Unsigned
+  Adress width              - 13
+  Data Width                - 128
+  Register Primitive Output - No
+  Register Core Output      - No
+  Optimization              - Minimum_Area
+  Data Binary Point         - 0
+  Initial Values (sim only) - Not important
+  Sample rate               - 1
+
+.. image:: tut_dac_bram_config.png
+
+
+Add your ``munge``
+^^^^^^^^^^^^^^^^^^
+This block reorders the data from the ``bram``, so that the 
+``rfdc`` can interpret it. ``din`` should connect to the ``bram``
+``data_out``. ``dout`` should connect to both ``s00_axis_tdata`` and ``s10_axis_tdata``
+
+.. code:: bash
+
+  Number of divisions       - 8
+  Division size (bits)      - 16*ones(1,8)
+  Division packing order    - [7 6 5 4 3 2 1 0]
+  Output arithmetic type    - Unsigned
+  Output binary point       - 0
+
+.. image:: tut_dac_munge_config.png
+
+
+Add your ``Counter``
+^^^^^^^^^^^^^^^^^^^^
+Connect the output of this block to the ``bram``'s ``addr`` port.
+
+This block will loop through all of the addresses in our bram, 
+playing our signal on repeat. If you add separate control
+logic, you can set a specific counter value, we don't need that level
+of control to play a sine wave.
+
+.. code:: bash
+
+  Counter type              - Free running
+  Count direction           - Up
+  Initaial value            - 0
+  Step                      - 1
+  Output type               - Unsigned
+  Number of bits            - 13
+  Binary point              - 0
+  Provide load port         - No
+  Provide sync reset port   - Yes
+  Provide enable port       - Yes
+  Sample period source      - Explicit
+  Sample rate               - 1
+
+.. image:: tut_dac_counter_config.png
+
+Add your ``Enable``
+^^^^^^^^^^^^^^^^^^^^
+Connect the output of this block to the ``Counter``'s ``en`` port.
+
+This block enables the playing of our sine wave and looks really cool
+while doing it.
+
+.. code:: bash
+
+  I/O direction             - From processor
+  I/O delay                 - 0
+  Initial Value             - dec2hex(0)
+  Sample period             - 1
+  Bitfield names [msb..lsb] - reg
+  Bitfield widths           - 1
+  Bitfield binary pts       - 0
+  Bitfield types            - 2 (bool)
+
+.. image:: tut_dac_enable_config.png
+
 
 
 Section 2: Generating your signal
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+``sine.py``
 
 .. code:: python
 import numpy as np
