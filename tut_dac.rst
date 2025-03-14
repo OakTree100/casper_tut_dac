@@ -225,74 +225,26 @@ you can run in ipython with ``run sine.py``
 Section 3: Sending your signal out
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-In [1]: import casperfpga
+1) Connect to and program your board normally
+2) Configure your DAC timing as you did in tutorial 2
+3) Generate your sine wave as shown above
+4) Write your sine wave to your bram, and a 1 to your enable register
 
-In [2]: run sine.py
-fs = 1966080000.0, fc = 393216000.0
-dt = 5.086263020833334e-10, tau = 3.3333333333333335e-05
-Expected 65536 values. Got 65536
-131072
-b'\x7f\xfcS\xc4\x0c8\x0c8'
+.. code:: python
 
-In [3]: rfsoc = casperfpga.CasperFpga('192.168.2.140')
+  In [9]: rfsoc.listdev()
+  Out[9]: 
+  ['rfdc',
+  'sys',
+  'sys_board_id',
+  'sys_clkcounter',
+  'sys_rev',
+  'sys_rev_rcs',
+  'sys_scratchpad',
+  'wf_bram_0',
+  'wf_en']
 
-In [4]: rfsoc.listdev()
-Out[4]: 
-['rfdc',
- 'sys',
- 'sys_board_id',
- 'sys_clkcounter',
- 'sys_rev',
- 'sys_rev_rcs',
- 'sys_scratchpad',
- 'wf_bram_0',
- 'wf_bram_1',
- 'wf_en',
- 'wf_len',
- 'wf_len1']
+  In [10]: rfsoc.write('wf_bram_0', buf)
 
-In [5]: rfsoc.upload_to_ram_and_program('rfsoc4x2_one_pps_2025-03-13_1656.fpg')
-Out[5]: True
-
-In [6]: rfsoc.listdev()
-Out[6]: 
-['rfdc',
- 'sys',
- 'sys_board_id',
- 'sys_clkcounter',
- 'sys_rev',
- 'sys_rev_rcs',
- 'sys_scratchpad',
- 'wf_bram_0',
- 'wf_bram_1',
- 'wf_en',
- 'wf_len',
- 'wf_len1']
-
-In [7]: rfsoc.adcs.rfdc.get_pll_config(1, rfsoc.adcs.rfdc.DAC_TILE)
-Out[7]: 
-{'Enabled': 1.0,
- 'RefClkFreq': 491.52,
- 'SampleRate': 1.96608,
- 'RefClkDivider': 16.0,
- 'FeedbackDivider': 4.0,
- 'OutputDivider': 0.0}
-
-In [8]: rfsoc.adcs.rfdc.status()
-Out[8]: 
-{'ADC0': {'Enabled': 1, 'State': 0, 'PLL': 1},
- 'ADC1': {'Enabled': 0},
- 'ADC2': {'Enabled': 0},
- 'ADC3': {'Enabled': 0},
- 'DAC0': {'Enabled': 1, 'State': 15, 'PLL': 1},
- 'DAC1': {'Enabled': 1, 'State': 15, 'PLL': 1},
- 'DAC2': {'Enabled': 1, 'State': 7, 'PLL': 0},
- 'DAC3': {'Enabled': 0}}
-
-In [9]: rfsoc.read_int('wf_len')
-Out[9]: 8191
-
-In [10]: rfsoc.write('wf_bram_0', buf)
-
-In [11]: rfsoc.write_int('wf_en', 1)
+  In [11]: rfsoc.write_int('wf_en', 1)
 
