@@ -21,13 +21,13 @@ This design will:
 
 The final design will look like this for the RFSoC 4x2:
 
-.. image:: tut_dac_layout.png
+.. image:: tut_dac_simple_layout.png
 
 
-Section 1: Assembling & Configuring the pieces
+Section 1: Assembling & Configuring the blocks
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-You'll need all these pieces
+You'll need all these blocks
  * System Generator
  * RFSoC 4x2 block
  * RFDC
@@ -36,18 +36,19 @@ You'll need all these pieces
  * munge
  * counter
 
-First, add your ``System Generator`` and ``RFSoC 4x2`` block. 
+Add your ``System Generator`` and ``RFSoC 4x2`` blocks
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code:: bash
 
   # RFSoC4x2
   User IP Clock Rate: 245.76, RFPLL PL Clock Rate: 491.52
 
-Add yout ``rfdc``
+Add your ``rfdc``
 ^^^^^^^^^^^^^^^^^
 Double click on it, and disable all
 available ADCs. Enable the first and second DAC tiles (228, 229), and only
-enable the DAC 0 in either. Your ``Required AXI4-Stream Clock (MHz)`` should be 245.76
+enable the DAC 0 in either. Your ``Required AXI4-Stream Clock (MHz)`` should be 245.76.
 Configure the DAC tiles as follows:
 
 .. code:: bash
@@ -248,3 +249,13 @@ Section 3: Sending your signal out
 
   In [11]: rfsoc.write_int('wf_en', 1)
 
+5) Connect a network analyzer or oscilloscope to your output.
+
+Your signal should be output on the DAC labed DAC_B. Why? Who knows
+Your signal in an network analyzer should look something like this:
+
+.. image:: spectrum_output.jpg
+
+Be aware, that if nothing is connected, you should always have signals
+at 491.52 MHz and 245.76 MHz. These signals come from your clocking
+structure and are an indicator that everything is working as expected.
