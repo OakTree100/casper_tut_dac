@@ -1,5 +1,5 @@
 import numpy as np
-import numpy.matlib
+import matplotlib.pyplot as plt
 import struct
 
 # bram parameters
@@ -37,6 +37,11 @@ x <<= 2
 buf = bytes()
 for i in x:
   buf += struct.pack('>h',i)
+
+# Print it out!
+plt.plot(np.ushort(x[:100])) # Who needs more than 100 elements anyways
+plt.title(f"fs = {fs / 1e6} MHz; fc = {fc / 1e6} MHz")
+plt.show()
 
 # We're done!, we can now write buf to our
 # bram. To make sure it exists, enter len(buf)

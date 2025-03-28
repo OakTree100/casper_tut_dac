@@ -25,7 +25,7 @@ The final design will look like this for the RFSoC 4x2:
 
 
 Section 1: Assembling & Configuring the blocks
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+----------------------------------------------
 
 You'll need all these blocks
  * System Generator
@@ -65,6 +65,7 @@ Configure the DAC tiles as follows:
   Interpolation Mode    - 1x 
   Samples Per AXI Cycle - 8 
   Mixer Type            - Coarse
+  Mixer Mode            - Real -> Real
   Frequency             - 0
   Nyquist Zone          - Zone 1
   Decoder Mode          - SNR Optimized
@@ -76,10 +77,6 @@ Configure the DAC tiles as follows:
 
 Add your ``bram``
 ^^^^^^^^^^^^^^^^^
-Connect the ``we`` port of the 
-bram to a Xilinx 0 constant. Connect the ``data_in``
-port to a Xilinx 0 constant. This will prevent the bram
-from being loaded from the fabric, requiring us to load it with software.
 
 .. code:: bash
 
@@ -98,9 +95,15 @@ from being loaded from the fabric, requiring us to load it with software.
 
 Add your ``munge``
 ^^^^^^^^^^^^^^^^^^
-This block reorders the data from the ``bram``, so that the 
-``rfdc`` can interpret it. ``din`` should connect to the ``bram``
-``data_out``. ``dout`` should connect to both ``s00_axis_tdata`` and ``s10_axis_tdata``
+We're using a munge to reorder data for compatibility between the ``rfdc`` and other casper blocks. 
+We'll study this block more in depth for Tutorial 3. This block takes a bus of some width (128 bits
+in our case), and separates it into pieces (some number of divisions, with some size for each)
+(8 16-bit samples for us), and then reorders them (we're just reversing things for DAC compatibility here).
+In hardware, this moves wires and costs nothing.
+
+``din`` should connect to the ``bram`` ``data_out``. 
+
+``dout`` should connect to both ``s00_axis_tdata`` and ``s10_axis_tdata`` on the ``rfdc``
 
 .. code:: bash
 
@@ -139,10 +142,42 @@ of control to play a sine wave.
 
 .. image:: tut_dac_counter_config.png
 
+
+Add your ``Constant`` s
+^^^^^^^^^^^^^^^^^^^^^^^
+We need 3 Xilinx Constant blocks.
+Connect the ``we`` port of the bram to a 0 boolean constant. 
+This will prevent the bram from being loaded from the fabric, 
+requiring us to load it with software.
+
+.. code:: bash
+
+  bram constants:
+    we
+      Constant Value    - 0
+      Output Type       - Boolean
+      Sampled Constant  - Yes
+      Sample period     - 1
+
+    data_in
+      Constant Value    - 0
+      Output Type       - Fixed Point
+      Number of Bits    - 128
+      Binary point      - 0
+      Sampled Constant  - Yes
+      Sample period     - 1
+
+  counter constant:
+    rst
+      Constant Value    - 0
+      Output Type       - Boolean
+      Sampled Constant  - Yes
+      Sample period     - 1      
+
 Add your ``Enable``
 ^^^^^^^^^^^^^^^^^^^^
+Connect the input of this block to a Simulink constant
 Connect the output of this block to the ``Counter``'s ``en`` port.
-
 This block enables the playing of our sine wave and looks really cool
 while doing it.
 
@@ -160,9 +195,33 @@ while doing it.
 .. image:: tut_dac_enable_config.png
 
 
+Optional: Add a waveform length ``wf_len`` register
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+To keep track of how many addresses our counter iterates over, we can 
+add register wf_len1. This block is primarily useful for debugging. We'll
+connect its output to a scope, so we can run a simulation in simulink.
+
+.. code:: bash
+
+  I/O direction             - To processor
+  I/O delay                 - 0
+  Initial Value             - dec2hex(0)
+  Sample period             - 1
+  Bitfield names [msb..lsb] - reg
+  Bitfield widths           - Equal to counter width
+  Bitfield binary pts       - 0
+  Bitfield types            - 0 (ufix)
+
+Once we've added this register, we'll be able to check it's value from ipython
+For now, we can press run, and watch our counter iterate over the data.
+In our scope, if we right click, we can find ``Signals & Ports``, and set the
+Number of Input Ports to 2. 
+We can connect the either input to the bram or munge and see the data change. 
+
+
 
 Section 2: Generating your signal
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+---------------------------------
 
 For this tutorial we will generate a sine wave in software. You can use 
 the provided code, we would recommend that you add it to a file, which
@@ -212,23 +271,47 @@ you can run in ipython with ``run sine.py``
   for i in x:
     buf += struct.pack('>h',i)
 
+  # # Code used to create plots shown below running 
+  # # python3 sine.py
+  # # from the terminal
+  # plt.plot(np.ushort(x[:100]))
+  # plt.title(f"fs = {fs / 1e6} MHz; fc = {fc / 1e6} MHz")
+  # plt.show()
+
   # We're done!, we can now write buf to our
   # bram. To make sure it exists, enter len(buf)
   # in your ipython terminal
 
   # If needed we can save it as a file 
-  # for later use, or transferability  
+  # for later use or transferability  
   f = open("sine.txt", "bw")
   f.write(buf)
 
+.. image:: sine_py_plot.png
+
+.. image:: sine_py_plot_2.png
+
+These images plot or sine wave data points that
+we wrote to our bram. In some cases, the wave will
+not be continuous between the last element of the bram
+and the first element, causing some noise. Additional 
+logic can reset our counter on a sample which will provide
+a smooth transition, but for this tutorial we've elected to
+keep things as simple as possible.
+
+Note that these sine wave data points are simply samples passed
+into our bram. In order to convert these to a voltage, we would
+need to consider the output power of our dac
 
 
 Section 3: Sending your signal out
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+----------------------------------
 
+0) Start an ipython session
 1) Connect to and program your board normally
-2) Configure your DAC timing as you did in tutorial 2
-3) Generate your sine wave as shown above
+2) Program your DAC clocks as you did for the ADCs in tutorial 2
+3) Generate your sine wave as shown above. This has to be done within your ipython 
+   session or in the same script to that your values are available in buf
 4) Write your sine wave to your bram, and a 1 to your enable register
 
 .. code:: python
@@ -256,6 +339,45 @@ Your signal in an network analyzer should look something like this:
 
 .. image:: spectrum_output.jpg
 
-Be aware, that if nothing is connected, you should always have signals
-at 491.52 MHz and 245.76 MHz. These signals come from your clocking
-structure and are an indicator that everything is working as expected.
+Be aware, that if nothing is enabled, you should always have signals
+at 491.52 MHz and 245.76 MHz. Your DAC Reference Clock and 
+your User IP Clock Rate. These signals are an indicator that your 
+``rfdc`` PLLs work as expected.
+
+
+Errors
+------
+If you get an error like the following, make sure that your constant block driving
+data_in on your bram has ``Number of Bits == 128``
+
+.. code:: bash
+
+  Width of slice (number of bits) is set ot a value of 32, but the value 
+  must be less than or equal to 16. The input signal bit-width, 16,
+  determines the upper bound for the width of the slice.
+  Error occurred during "Rate and Type Error Checking"
+
+  Reported by:
+    'design/shared_bram/munge_in/split/slice3'
+
+
+If you get an error like the following, make sure your bram address width in your
+simulink model matches the bram address width in your ``sine.py`` script (the script
+in Section 2)
+
+.. code:: python
+
+  UnicodeDecodeError                        Traceback (most recent call last)
+  Cell In[7], line 1
+  ----> 1 rfsoc.write('shared_bram', buf)
+
+  ...
+  ...
+
+  File ~/.conda/envs/enmotion/lib/python3.8/site-packages/katcp/core.py:384, in Message.__str__(self)
+      382     return byte_str
+      383 else:
+  --> 384     return byte_str.decode('utf-8')
+
+  UnicodeDecodeError: 'utf-8' codec can't decode byte 0x88 in position 21: invalid start byte
+
