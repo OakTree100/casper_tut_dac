@@ -16,8 +16,7 @@ This design will:
   * Set sample rates
   * Use the internal PLLs to generate the sample clock
   * Output a sinusoidal signal
-  * Use the decimator
-  * Use the coarse frequency mixer (NCO)
+  * Write and read data from a bram
 
 The final design will look like this for the RFSoC 4x2:
 
@@ -31,10 +30,11 @@ You'll need all these blocks
  * System Generator
  * RFSoC 4x2 block
  * RFDC
- * enable software register
+ * An "enable" software register
  * bram
  * munge
  * counter
+ * Xilinx constants
 
 Add your ``System Generator`` and ``RFSoC 4x2`` blocks
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -77,11 +77,23 @@ Configure the DAC tiles as follows:
 
 Add your ``bram``
 ^^^^^^^^^^^^^^^^^
+The bram is where we'll save the data to drive the dac.
+Inside of our FPGA PL (Programmable Logic) there are bram memory blocks spread 
+throughout the fabric. Each of these memory banks has a specific size,
+if we request more capacity than a single bram can provide, we may encounter
+timing violations that can be addressed through delay blocks.
+We choose a ``Data Width`` of 128 because the ``rfdc`` takes in 8 16-bit samples
+every clock cycle.
+
+We'll drive this block's ports as follows:
+ * ``addr`` - A counter to loop through our samples,
+ * ``we`` - A boolean 0 to prevent this bram from being written to by any PL blocks
+ * ``data_in`` - A 128 bit 0 because we need an appropriately sized Xilinx block driving this port
 
 .. code:: bash
 
   Output Data Type          - Unsigned
-  Adress width              - 13
+  Address width             - 13
   Data Width                - 128
   Register Primitive Output - No
   Register Core Output      - No
@@ -95,11 +107,11 @@ Add your ``bram``
 
 Add your ``munge``
 ^^^^^^^^^^^^^^^^^^
-We're using a munge to reorder data for compatibility between the ``rfdc`` and other casper blocks. 
-We'll study this block more in depth for Tutorial 3. This block takes a bus of some width (128 bits
-in our case), and separates it into pieces (some number of divisions, with some size for each)
+On the output of our ``bram`` we're using a munge to reorder data for compatibility between the ``rfdc`` 
+and other casper blocks. We'll study this block more in depth for Tutorial 3. This block takes a bus of 
+some width (128 bits in our case), and separates it into pieces (some number of divisions, with some size for each)
 (8 16-bit samples for us), and then reorders them (we're just reversing things for DAC compatibility here).
-In hardware, this moves wires and costs nothing.
+In hardware, this routes wires and costs nothing.
 
 ``din`` should connect to the ``bram`` ``data_out``. 
 
@@ -122,8 +134,8 @@ Connect the output of this block to the ``bram``'s ``addr`` port.
 
 This block will loop through all of the addresses in our bram, 
 playing our signal on repeat. If you add separate control
-logic, you can set a specific counter value, we don't need that level
-of control to play a sine wave.
+logic, you can set a specific counter value to restart playback,
+for now we don't need that level of control to play a sine wave.
 
 .. code:: bash
 
@@ -143,12 +155,9 @@ of control to play a sine wave.
 .. image:: tut_dac_counter_config.png
 
 
-Add your ``Constant`` s
-^^^^^^^^^^^^^^^^^^^^^^^
+Add some ``Constant`` blocks
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 We need 3 Xilinx Constant blocks.
-Connect the ``we`` port of the bram to a 0 boolean constant. 
-This will prevent the bram from being loaded from the fabric, 
-requiring us to load it with software.
 
 .. code:: bash
 
@@ -232,13 +241,14 @@ you can run in ipython with ``run sine.py``
 .. code:: python
 
   import numpy as np
-  import numpy.matlib
   import struct
   
-  # bram parameters
+  # bram parameters - need to match our yellow block's values
   block_size = 128  # <bram data_width>
-  bits_per_val = 16 # <rfdc input data size> 16 bits for rfsoc4x2
   blocks = 2**13    # 2**<bram address_width>
+  bits_per_val = 16 # <rfdc input data size> 16 bits for rfsoc4x2
+  # We need to make sure our output data size matches the bram's
+  # capacity, so we don't fail on writes
   num_vals = int(block_size / bits_per_val * blocks)
   
   # sine wave parameters
@@ -271,9 +281,10 @@ you can run in ipython with ``run sine.py``
   for i in x:
     buf += struct.pack('>h',i)
 
-  # # Code used to create plots shown below running 
+  # # Code used to create plots shown below code block 
   # # python3 sine.py
-  # # from the terminal
+  # # ^ run from the terminal
+  # import matplotlib.pyplot as plt
   # plt.plot(np.ushort(x[:100]))
   # plt.title(f"fs = {fs / 1e6} MHz; fc = {fc / 1e6} MHz")
   # plt.show()
@@ -339,10 +350,12 @@ Your signal in an network analyzer should look something like this:
 
 .. image:: spectrum_output.jpg
 
-Be aware, that if nothing is enabled, you should always have signals
+Be aware, that if ``wf_en`` is disabled, you may still have signals
 at 491.52 MHz and 245.76 MHz. Your DAC Reference Clock and 
-your User IP Clock Rate. These signals are an indicator that your 
-``rfdc`` PLLs work as expected.
+your User IP Clock Rate. We use wf_en to run our counter block. If 
+we stop counting, we won't stop playing data, we'll just loop the 
+same 8 samples forever. If we set those samples to 0s, we lose those
+signals.
 
 
 Errors
