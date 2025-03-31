@@ -41,6 +41,8 @@ for i in x:
 # Print it out!
 plt.plot(np.ushort(x[:100])) # Who needs more than 100 elements anyways
 plt.title(f"fs = {fs / 1e6} MHz; fc = {fc / 1e6} MHz")
+plt.xlabel("Sample Index")
+plt.ylabel("Sample Value")
 plt.show()
 
 # We're done!, we can now write buf to our

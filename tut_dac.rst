@@ -298,9 +298,9 @@ you can run in ipython with ``run sine.py``
   f = open("sine.txt", "bw")
   f.write(buf)
 
-.. image:: sine_py_plot.png
+.. image:: sine_py_plot-393mhz.png
 
-.. image:: sine_py_plot_2.png
+.. image:: sine_py_plot-131mhz.png
 
 These images plot or sine wave data points that
 we wrote to our bram. In some cases, the wave will
@@ -320,9 +320,8 @@ Section 3: Sending your signal out
 
 0) Start an ipython session
 1) Connect to and program your board normally
-2) Program your DAC clocks as you did for the ADCs in tutorial 2
-3) Generate your sine wave as shown above. This has to be done within your ipython 
-   session or in the same script to that your values are available in buf
+2) Program your DAC clocks as you did for the ADCs in tutorial 2, run ``init()`` and ``status()`` on your RFDC
+3) Generate your sine wave as shown above. This has to be done within your ipython session or in the same script to that your values are available in buf
 4) Write your sine wave to your bram, and a 1 to your enable register
 
 .. code:: python
@@ -343,9 +342,10 @@ Section 3: Sending your signal out
 
   In [11]: rfsoc.write_int('wf_en', 1)
 
-5) Connect a network analyzer or oscilloscope to your output.
+5) Connect a network analyzer or oscilloscope to your output. (DAC B if using tile 228 - `RealDigital <https://www.realdigital.org/hardware/rfsoc-4x2>`_ -> Resources -> Reference Manual (Revision A5))
 
-Your signal should be output on the DAC labed DAC_B. Why? Who knows
+.. image:: tut_dac_rfdc_layout.png
+
 Your signal in an network analyzer should look something like this:
 
 .. image:: spectrum_output.jpg
@@ -353,7 +353,7 @@ Your signal in an network analyzer should look something like this:
 Be aware, that if ``wf_en`` is disabled, you may still have signals
 at 491.52 MHz and 245.76 MHz. Your DAC Reference Clock and 
 your User IP Clock Rate. We use wf_en to run our counter block. If 
-we stop counting, we won't stop playing data, we'll just loop the 
+we disable our counter, we won't stop playing data, we'll just loop the 
 same 8 samples forever. If we set those samples to 0s, we lose those
 signals.
 
