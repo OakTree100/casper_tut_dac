@@ -2,24 +2,29 @@ Tutorial 2.5: The RFDC DAC Interface
 ====================================
 
 Introduction
-------------
-In the previous tutorial we introduced the RFDC Yellow block, with configurations
-for the dual- and quad-tile RFSoCs with ADCs. It it worth providing a brief
+************
+In the previous tutorial we introduced the RFDC Yellow block, configuring
+it for dual- and quad-tile RFSoCs ADCs. It it worth providing a brief
 introduction to the DAC interface. This tutorial assumes you have completed through
 the RFDC tutorial :doc:`RFDC Interface <./tut_rfdc>`
 
-In this tutorial we have two designs, a ADC-DAC loopback and a waveform
-generator. The specific configuration targets a RFSoC4x2 board, but should
+In this tutorial we have two designs,
+:ref:`The Loopback Design<loopback>` and 
+:ref:`The Waveform Generator Design<wf_generator>`. 
+The specific configuration targets a RFSoC4x2 board, but should
 be similar for other RFSoC based devices.
 We'll start with the loopback.
 
+
+.. _loopback:
+
 The Loopback Design
--------------------
+*******************
 
 This design will:
   * Configure the DAC
   * Configure the ADC
-  * Setup Clocks
+  * Demonstrate data transfer
   
 The final design will look like this for the RFSoC 4x2:
 
@@ -34,7 +39,7 @@ You'll need all these blocks
  * RFSoC 4x2 block
  * RFDC
  * Two software registers
- * delay
+ * Delay
 
 Add your ``System Generator`` and ``RFSoC 4x2`` blocks
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -110,7 +115,6 @@ Add your ``software_register`` blocks
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 We need to add one input and one output software register
 so that the AXI bus can be configured correctly when we run ``jasper``.
-These registers won't do anything but should be present.
 A simulink constant should drive a register with direction 
 ``From Processor`` which should drive a register with direction
 ``To Processor``, which should drive a terminator. We never write
@@ -156,16 +160,17 @@ Section 2: Hardware Test
 
 
 
+.. _wf_generator:
 
 The Waveform Generator Design
------------------------------
+*****************************
 In this example we will configure the RFDC for a dual-tile RFSoC4x2 board.
 
 This design will:
   * Set sample rates
   * Use the internal PLLs to generate the sample clock
-  * Output a sinusoidal signal
   * Write and read data from a bram
+  * Output a signal from a bram
 
 The final design will look like this for the RFSoC 4x2:
 
@@ -180,9 +185,9 @@ You'll need all these blocks
  * RFSoC 4x2 block
  * RFDC
  * An "enable" software register
- * bram
- * munge
- * counter
+ * Bram
+ * Munge
+ * Counter
  * Xilinx constants
 
 Add your ``System Generator`` and ``RFSoC 4x2`` blocks
@@ -237,7 +242,7 @@ every clock cycle.
 We'll drive this block's ports as follows:
  * ``addr`` - A counter to loop through our samples,
  * ``we`` - A boolean 0 to prevent this bram from being written to by any PL blocks
- * ``data_in`` - A 128 bit 0 because we need an appropriately sized Xilinx block driving this port
+ * ``data_in`` - A 128 bit 0 Xilinx block for data width compatibility
 
 .. code:: bash
 
@@ -256,11 +261,13 @@ We'll drive this block's ports as follows:
 
 Add your ``munge`` block
 ^^^^^^^^^^^^^^^^^^^^^^^^
-On the output of our ``bram`` we're using a munge to reorder data for compatibility between the ``rfdc`` 
-and other casper blocks. We'll study this block more in depth in :doc:`Tutorial 3 <./tut_spec>`. This block takes a bus of 
-some width (128 bits in our case), and separates it into pieces (some number of divisions, with some size for each)
-(8 16-bit samples for us), and then reorders them (we're just reversing things for DAC compatibility here).
-In hardware, this routes wires and costs nothing.
+On the output of our ``bram`` we're using a munge to reorder data for compatibility between 
+the ``bram`` data order and the ``rfdc`` data order. We'll study this block more in depth in 
+:doc:`Tutorial 3 <./tut_spec>`. This block takes a bus of 
+some width (128 bits in our case), and separates it into pieces 
+(some number of divisions, with some size for each)
+(8 16-bit samples for us), and then reorders them (we're just reversing things 
+for DAC compatibility here). In hardware, this routes wires and costs nothing.
 
 ``din`` should connect to the ``bram`` ``data_out``. 
 
@@ -283,8 +290,8 @@ Connect the output of this block to the ``bram``'s ``addr`` port.
 
 This block will loop through all of the addresses in our bram, 
 playing our signal on repeat. If you add separate control
-logic, you can set a specific counter value to restart playback,
-for now we don't need that level of control to play a sine wave.
+logic, you can set a specific address to restart playback, which would
+clean up our signal. But we don't need that level of control for this example.
 
 .. code:: bash
 
@@ -336,8 +343,7 @@ Add your ``Enable`` software_register block
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Connect the input of this block to a Simulink constant
 Connect the output of this block to the ``Counter``'s ``en`` port.
-This block enables the playing of our sine wave and looks really cool
-while doing it.
+By activating or deactivating the counter, we can play or pause our signal.
 
 .. code:: bash
 
@@ -357,7 +363,7 @@ Optional: Add a waveform length ``wf_len`` register
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 To keep track of how many addresses our counter iterates over, we can 
 add register wf_len1. This block is primarily useful for debugging. We'll
-connect its output to a scope, so we can run a simulation in simulink.
+connect its output to a scope, for a simulation in simulink.
 
 .. code:: bash
 
@@ -370,8 +376,8 @@ connect its output to a scope, so we can run a simulation in simulink.
   Bitfield binary pts       - 0
   Bitfield types            - 0 (ufix)
 
-Once we've added this register, we'll be able to check it's value from ipython
-For now, we can press run, and watch our counter iterate over the data.
+We'll be able to check this register's value from ipython.
+For now, we can press run, and watch our counter iterate over the addresses.
 In our scope, if we right click, we can find ``Signals & Ports``, and set the
 Number of Input Ports to 2. 
 We can connect the either input to the bram or munge and see the data change. 
@@ -434,34 +440,34 @@ named ``sine.py``, which you can run in ipython with ``run sine.py``
   # bram. To make sure it exists, enter len(buf)
   # in your ipython terminal
 
-  # # Code used to create plots shown below code block 
-  # # python3 sine.py
-  # # ^ run from the terminal
-  # import matplotlib.pyplot as plt
-  # plt.plot(np.ushort(x[:100]))
-  # plt.title(f"fs = {fs / 1e6} MHz; fc = {fc / 1e6} MHz")
-  # plt.show()
+.. code:: python
 
-  # # If needed we can save it as a file 
-  # # for later use or transferability  
-  # f = open("sine.txt", "bw")
-  # f.write(buf)
+  # Code used to create plots shown below code
+  # this code runs in same session as code block above
+  import matplotlib.pyplot as plt
+  plt.plot(np.ushort(x[:100]))
+  plt.title(f"fs = {fs / 1e6} MHz; fc = {fc / 1e6} MHz")
+  plt.show()
+
+  # If needed we can save it as a file 
+  # for later use or transferability  
+  f = open("sine.txt", "bw")
+  f.write(buf)
 
 .. image:: sine_py_plot-393mhz.png
 
 .. image:: sine_py_plot-131mhz.png
 
-These images plot or sine wave data points that
-we wrote to our bram. In some cases, the wave will
-not be continuous between the last element of the bram
-and the first element, causing some noise. Additional 
+These images plot our sine wave data points written to our bram.
+In most cases, the wave will not be continuous between the last 
+element of the bram and the first element, causing noise. Additional 
 logic can reset our counter on a sample which will provide
 a smooth transition, but for this tutorial we've elected to
 keep things as simple as possible.
 
 Note that these sine wave data points are simply samples passed
-into our bram. In order to convert these to a voltage, we would
-need to consider the output power of our dac
+into our dac. In order to convert these to dBm we would
+consider the output power of our dac
 
 
 Section 3: Sending your signal out
@@ -501,11 +507,11 @@ Your signal in a network analyzer should look something like this:
 .. image:: spectrum_output.jpg
 
 Be aware, that if ``wf_en`` is disabled, you may still have signals
-at 491.52 MHz and 245.76 MHz. Your DAC Reference Clock and 
-your User IP Clock Rate. We use wf_en to run our counter block. If 
-we disable our counter, we won't stop playing data, we'll just loop the 
-same 8 samples forever. If we set those samples to 0s, we lose those
-signals.
+at 491.52 MHz and 245.76 MHz. Equivalent to your DAC Reference Clock and 
+User IP Clock Rate. Our counter controls the address data is read from. If 
+we pause our counter, we won't stop playing data, we'll play the 
+same 8 samples every clock cycle.
+If we set our ``bram`` samples to 0s (or any constant), we lose those signals.
 
 
 Errors
