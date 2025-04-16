@@ -387,11 +387,13 @@ We can connect the either input to the bram or munge and see the data change.
 Section 2: Generating your signal
 ---------------------------------
 
-For this tutorial we will generate a sine wave in software. You can use 
-the provided code, we would recommend that you copy the provided code to a file
-named ``sine.py``, which you can run in ipython with ``run sine.py``
-
-``sine.py``
+For this tutorial we will generate a sine wave in software, then 
+copy it to the ``bram``.
+We would recommend that you save the provided code to a file.
+A file named ``sine.py`` in the active directory can be run in 
+ipython with ``run sine.py``.
+All of the variables declared in ``sine.py`` are accessible in that
+ipython session.
 
 .. code:: python
 
