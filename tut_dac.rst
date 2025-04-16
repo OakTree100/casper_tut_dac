@@ -8,8 +8,157 @@ for the dual- and quad-tile RFSoCs with ADCs. It it worth providing a brief
 introduction to the DAC interface. This tutorial assumes you have completed through
 the RFDC tutorial :doc:`RFDC Interface <./tut_rfdc>`
 
-The Example Design
---------------------
+In this tutorial we have two designs, a ADC-DAC loopback and a waveform
+generator. The specific configuration targets a RFSoC4x2 board, but should
+be similar for other RFSoC based devices.
+We'll start with the loopback.
+
+The Loopback Design
+-------------------
+
+This design will:
+  * Configure the DAC
+  * Configure the ADC
+  * Setup Clocks
+  
+The final design will look like this for the RFSoC 4x2:
+
+.. image:: loop_layout.png
+
+
+Section 1: Assembling & Configuring the blocks
+----------------------------------------------
+
+You'll need all these blocks
+ * System Generator
+ * RFSoC 4x2 block
+ * RFDC
+ * Two software registers
+ * delay
+
+Add your ``System Generator`` and ``RFSoC 4x2`` blocks
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code:: bash
+
+  # RFSoC4x2
+  User IP Clock Rate: 245.76, RFPLL PL Clock Rate: 491.52
+
+Add your ``rfdc`` block
+^^^^^^^^^^^^^^^^^^^^^^^
+Enable the first and second DAC tiles (228, 229), and only
+enable DAC 0 in either.
+Your ``Required AXI4-Stream Clock (MHz)`` should be 245.76.
+Configure the DAC tiles as follows:
+
+.. code:: bash
+
+  # DAC Tile Config
+  Enable Multi-Tile Sync - False
+  Sampling Rate   (MHz)  - 1966.08
+  Clock Out       (MHz)  - 122.88
+  Reference Clock (MHz)  - 491.52
+  Enable Tile PLLs       - True
+  Output Power           - 20
+
+  # DAC 0 Config
+  Analog Output Data     - Real 
+  Interpolation Mode     - 1x 
+  Samples Per AXI Cycle  - 8 
+  Mixer Type             - Coarse
+  Mixer Mode             - Real -> Real
+  Frequency              - 0
+  Nyquist Zone           - Zone 1
+  Decoder Mode           - SNR Optimized
+
+  CHECK:
+  Does your Required AXI4-Stream clock say 245.76?
+
+.. image:: loop_dac.png
+
+Enable the first and second ADC tiles (224, 225), and only
+enable ADC 0 in either. 
+Your ``Required AXI4-Stream Clock (MHz)`` should be 245.76.
+Configure the ADC tiles as follows:
+
+.. code:: bash
+
+  # ADC Tile Config
+  Enable Multi-Tile Sync - False
+  Sampling Rate   (MHz)  - 3932.16
+  Clock Out       (MHz)  - 122.88
+  Reference Clock (MHz)  - 491.52
+  Enable Tile PLLs       - True
+
+  # ADC 0 Config
+  Digital Output Data    - Real 
+  Decimation Mode        - 2x
+  Samples Per AXI Cycle  - 8
+  Mixer Type             - Bypassed
+  Mixer Mode             - Real -> Real
+  Nyquist Zone           - Zone 1
+  Calibration Mode       - Mode 2
+
+  CHECK:
+  Does your Required AXI4-Stream clock say 245.76?
+
+.. image:: loop_adc.png
+
+Your ADC signal should drive both DAC inputs m00 and m10
+
+Add your ``software_register`` blocks
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+We need to add one input and one output software register
+so that the AXI bus can be configured correctly when we run ``jasper``.
+These registers won't do anything but should be present.
+A simulink constant should drive a register with direction 
+``From Processor`` which should drive a register with direction
+``To Processor``, which should drive a terminator. We never write
+to nor read from these blocks.
+
+Add your ``delay`` block
+^^^^^^^^^^^^^^^^^^^^^^^^
+To more easily meet timing constraints I added a delay block
+on the wire between ADC output and DAC input. This is best 
+practice, but might not be needed for this design.
+
+
+Section 2: Hardware Test
+------------------------
+
+0) Start an ipython session
+1) Import casperfpga, and connect to and program your board normally
+2) Program your DAC clocks as you did for the ADCs in tutorial 2, run ``init()`` and ``status()`` on your RFDC
+   Make sure your rfdc finishes its power-up sequence
+
+
+.. code:: bash
+
+  ADC0: Enabled 1, State 15, PLL 1
+  ADC1: Enabled 1, State 12, PLL 1
+  ADC2: Enabled 0
+  ADC3: Enabled 0
+  DAC0: Enabled 1, State 15, PLL 1
+  DAC1: Enabled 1, State 15, PLL 1
+  DAC2: Enabled 0
+  DAC3: Enabled 0
+
+3) Connect a signal generator to your input (ADC D if using tile 224)
+   I used a 400MHz signal at -20 dBm.
+
+.. image:: tut_dac_rfdc_layout.png
+
+4) Connect a network analyzer or oscilloscope to your output. 
+   DAC B if using tile 228
+   (`RealDigital <https://www.realdigital.org/hardware/rfsoc-4x2>`_ -> Resources -> Reference Manual (Revision A5))
+
+5) Check that the input signal appears on your nextwork analyzer
+
+
+
+
+The Waveform Generator Design
+-----------------------------
 In this example we will configure the RFDC for a dual-tile RFSoC4x2 board.
 
 This design will:
@@ -44,11 +193,11 @@ Add your ``System Generator`` and ``RFSoC 4x2`` blocks
   # RFSoC4x2
   User IP Clock Rate: 245.76, RFPLL PL Clock Rate: 491.52
 
-Add your ``rfdc``
-^^^^^^^^^^^^^^^^^
-Double click on it, and disable all
-available ADCs. Enable the first and second DAC tiles (228, 229), and only
-enable the DAC 0 in either. Your ``Required AXI4-Stream Clock (MHz)`` should be 245.76.
+Add your ``rfdc`` block
+^^^^^^^^^^^^^^^^^^^^^^^
+Double click on it, and disable all available ADC tiles. 
+Enable the first and second DAC tiles (228, 229), and only
+enable DAC 0 in either. Your ``Required AXI4-Stream Clock (MHz)`` should be 245.76.
 Configure the DAC tiles as follows:
 
 .. code:: bash
@@ -75,8 +224,8 @@ Configure the DAC tiles as follows:
 
 .. image:: dac_config.png
 
-Add your ``bram``
-^^^^^^^^^^^^^^^^^
+Add your ``shared_bram`` block
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 The bram is where we'll save the data to drive the dac.
 Inside of our FPGA PL (Programmable Logic) there are bram memory blocks spread 
 throughout the fabric. Each of these memory banks has a specific size,
@@ -105,10 +254,10 @@ We'll drive this block's ports as follows:
 .. image:: tut_dac_bram_config.png
 
 
-Add your ``munge``
-^^^^^^^^^^^^^^^^^^
+Add your ``munge`` block
+^^^^^^^^^^^^^^^^^^^^^^^^
 On the output of our ``bram`` we're using a munge to reorder data for compatibility between the ``rfdc`` 
-and other casper blocks. We'll study this block more in depth for Tutorial 3. This block takes a bus of 
+and other casper blocks. We'll study this block more in depth in :doc:`Tutorial 3 <./tut_spec>`. This block takes a bus of 
 some width (128 bits in our case), and separates it into pieces (some number of divisions, with some size for each)
 (8 16-bit samples for us), and then reorders them (we're just reversing things for DAC compatibility here).
 In hardware, this routes wires and costs nothing.
@@ -128,8 +277,8 @@ In hardware, this routes wires and costs nothing.
 .. image:: tut_dac_munge_config.png
 
 
-Add your ``Counter``
-^^^^^^^^^^^^^^^^^^^^
+Add your ``Counter`` block
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 Connect the output of this block to the ``bram``'s ``addr`` port.
 
 This block will loop through all of the addresses in our bram, 
@@ -183,8 +332,8 @@ We need 3 Xilinx Constant blocks.
       Sampled Constant  - Yes
       Sample period     - 1      
 
-Add your ``Enable``
-^^^^^^^^^^^^^^^^^^^^
+Add your ``Enable`` software_register block
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Connect the input of this block to a Simulink constant
 Connect the output of this block to the ``Counter``'s ``en`` port.
 This block enables the playing of our sine wave and looks really cool
@@ -233,8 +382,8 @@ Section 2: Generating your signal
 ---------------------------------
 
 For this tutorial we will generate a sine wave in software. You can use 
-the provided code, we would recommend that you add it to a file, which
-you can run in ipython with ``run sine.py``
+the provided code, we would recommend that you copy the provided code to a file
+named ``sine.py``, which you can run in ipython with ``run sine.py``
 
 ``sine.py``
 
@@ -247,17 +396,17 @@ you can run in ipython with ``run sine.py``
   block_size = 128  # <bram data_width>
   blocks = 2**13    # 2**<bram address_width>
   bits_per_val = 16 # <rfdc input data size> 16 bits for rfsoc4x2
-  # We need to make sure our output data size matches the bram's
-  # capacity, so we don't fail on writes
+  # We need our output data size to match the bram's
+  # capacity so we don't fail on writes
   num_vals = int(block_size / bits_per_val * blocks)
   
   # sine wave parameters
-  fs = 1966.08e6      # Sampling frequency
+  fs = 1966.08e6      # RFDC sampling frequency
   fc = 393.216e6      # Carrier frequency
   dt = 1/fs           # Time length between samples
   tau = dt * num_vals # Time length of bram 
   
-  # Useful info if running as a script
+  # Print useful info
   print(f"fs = {fs / 1e6} MHz")
   print(f"fc = {fc / 1e6} MHz")
   
@@ -281,6 +430,10 @@ you can run in ipython with ``run sine.py``
   for i in x:
     buf += struct.pack('>h',i)
 
+  # We're done!, we can now write buf to our
+  # bram. To make sure it exists, enter len(buf)
+  # in your ipython terminal
+
   # # Code used to create plots shown below code block 
   # # python3 sine.py
   # # ^ run from the terminal
@@ -289,14 +442,10 @@ you can run in ipython with ``run sine.py``
   # plt.title(f"fs = {fs / 1e6} MHz; fc = {fc / 1e6} MHz")
   # plt.show()
 
-  # We're done!, we can now write buf to our
-  # bram. To make sure it exists, enter len(buf)
-  # in your ipython terminal
-
-  # If needed we can save it as a file 
-  # for later use or transferability  
-  f = open("sine.txt", "bw")
-  f.write(buf)
+  # # If needed we can save it as a file 
+  # # for later use or transferability  
+  # f = open("sine.txt", "bw")
+  # f.write(buf)
 
 .. image:: sine_py_plot-393mhz.png
 
@@ -319,9 +468,10 @@ Section 3: Sending your signal out
 ----------------------------------
 
 0) Start an ipython session
-1) Connect to and program your board normally
+1) Import casperfpga, and connect to and program your board normally
 2) Program your DAC clocks as you did for the ADCs in tutorial 2, run ``init()`` and ``status()`` on your RFDC
-3) Generate your sine wave as shown above. This has to be done within your ipython session or in the same script to that your values are available in buf
+3) Generate your sine wave with ``run sine.py``. 
+   This has to be done within your ipython session or in the same script to that your values are available in buf
 4) Write your sine wave to your bram, and a 1 to your enable register
 
 .. code:: python
@@ -342,11 +492,11 @@ Section 3: Sending your signal out
 
   In [11]: rfsoc.write_int('wf_en', 1)
 
-5) Connect a network analyzer or oscilloscope to your output. (DAC B if using tile 228 - `RealDigital <https://www.realdigital.org/hardware/rfsoc-4x2>`_ -> Resources -> Reference Manual (Revision A5))
+5) Connect a network analyzer or oscilloscope to your output. DAC B if using tile 228 (`RealDigital <https://www.realdigital.org/hardware/rfsoc-4x2>`_ -> Resources -> Reference Manual (Revision A5))
 
 .. image:: tut_dac_rfdc_layout.png
 
-Your signal in an network analyzer should look something like this:
+Your signal in a network analyzer should look something like this:
 
 .. image:: spectrum_output.jpg
 
