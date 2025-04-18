@@ -47,14 +47,15 @@ Add your ``System Generator`` and ``RFSoC 4x2`` blocks
 .. code:: bash
 
   # RFSoC4x2
-  User IP Clock Rate: 245.76, RFPLL PL Clock Rate: 491.52
+  User IP Clock Rate: 245.76, RFPLL PL Clock Rate: 122.88
 
 Add your ``rfdc`` block
 ^^^^^^^^^^^^^^^^^^^^^^^
 Enable the first and second DAC tiles (228, 229), and only
-enable DAC 0 in either.
+enable DAC 0 in either. Other tiles can be optionally disabled,
+but all enabled tiles should have the same ``Required AXI4-Stream Clock``
 Your ``Required AXI4-Stream Clock (MHz)`` should be 245.76.
-Configure the DAC tiles as follows:
+Configure each enabled DAC tile as follows:
 
 .. code:: bash
 
@@ -82,9 +83,10 @@ Configure the DAC tiles as follows:
 .. image:: loop_dac.png
 
 Enable the first and second ADC tiles (224, 225), and only
-enable ADC 0 in either. 
+enable ADC 0 in either. Other tiles can be optionally disabled,
+but all enabled tiles should have the same ``Required AXI4-Stream Clock``
 Your ``Required AXI4-Stream Clock (MHz)`` should be 245.76.
-Configure the ADC tiles as follows:
+Configure each enabled ADC tile as follows:
 
 .. code:: bash
 
@@ -109,7 +111,9 @@ Configure the ADC tiles as follows:
 
 .. image:: loop_adc.png
 
-Your ADC signal should drive both DAC inputs m00 and m10
+
+**Your ADC m00_axis_tdata signal should drive both DAC inputs
+(s00_axis_tdata and s10_axis_tdata)**
 
 Add your ``software_register`` blocks
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -125,6 +129,8 @@ Add your ``delay`` block
 To more easily meet timing constraints I added a delay block
 on the wire between ADC output and DAC input. This is best 
 practice, but might not be needed for this design.
+
+.. image:: loop_layout.png
 
 
 Section 2: Hardware Test
@@ -196,7 +202,7 @@ Add your ``System Generator`` and ``RFSoC 4x2`` blocks
 .. code:: bash
 
   # RFSoC4x2
-  User IP Clock Rate: 245.76, RFPLL PL Clock Rate: 491.52
+  User IP Clock Rate: 245.76, RFPLL PL Clock Rate: 122.88
 
 Add your ``rfdc`` block
 ^^^^^^^^^^^^^^^^^^^^^^^
