@@ -170,13 +170,13 @@ Section 2: Hardware Test
 
 The Waveform Generator Design
 *****************************
-In this example we will configure the RFDC for a dual-tile RFSoC4x2 board.
+In this example we will run the RFDC with data from a bram on a the RFSoC4x2 board.
 
 This design will:
   * Set sample rates
   * Use the internal PLLs to generate the sample clock
   * Write and read data from a bram
-  * Output a signal from a bram
+  * Output a signal from a DAC
 
 The final design will look like this for the RFSoC 4x2:
 
@@ -241,7 +241,8 @@ The bram is where we'll save the data to drive the dac.
 Inside of our FPGA PL (Programmable Logic) there are bram memory blocks spread 
 throughout the fabric. Each of these memory banks has a specific size,
 if we request more capacity than a single bram can provide, we may encounter
-timing violations that can be addressed through delay blocks.
+timing violations, which can be resolved with delay blocks.
+
 We choose a ``Data Width`` of 128 because the ``rfdc`` takes in 8 16-bit samples
 every clock cycle.
 
@@ -251,6 +252,8 @@ We'll drive this block's ports as follows:
  * ``data_in`` - A 128 bit 0 Xilinx block for data width compatibility
 
 .. code:: bash
+
+  Name                      - wf_bram_0
 
   Output Data Type          - Unsigned
   Address width             - 13
@@ -292,12 +295,14 @@ for DAC compatibility here). In hardware, this routes wires and costs nothing.
 
 Add your ``Counter`` block
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Connect the output of this block to the ``bram``'s ``addr`` port.
+Connect the output of the counter to the ``bram``'s ``addr`` port.
 
 This block will loop through all of the addresses in our bram, 
-playing our signal on repeat. If you add separate control
-logic, you can set a specific address to restart playback, which would
-clean up our signal. But we don't need that level of control for this example.
+playing our signal on repeat. 
+
+If you drive the counter reset port with logic,
+you can set a specific address to restart playback, which could
+clean up the signal. For this tutorial we don't need that level of control.
 
 .. code:: bash
 
@@ -353,6 +358,8 @@ By activating or deactivating the counter, we can play or pause our signal.
 
 .. code:: bash
 
+  Name                      - wf_en
+
   I/O direction             - From processor
   I/O delay                 - 0
   Initial Value             - dec2hex(0)
@@ -365,13 +372,19 @@ By activating or deactivating the counter, we can play or pause our signal.
 .. image:: tut_dac_enable_config.png
 
 
-Optional: Add a waveform length ``wf_len`` register
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Add a waveform length ``wf_len`` register
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+While this block is useful for debugging, it primarily exists because
+we need an output software register (``To processor``) for the design
+to compile correctly.
+
 To keep track of how many addresses our counter iterates over, we can 
 add register wf_len1. This block is primarily useful for debugging. We'll
 connect its output to a scope, for a simulation in simulink.
 
 .. code:: bash
+
+  Name                      - wf_len
 
   I/O direction             - To processor
   I/O delay                 - 0
@@ -384,8 +397,8 @@ connect its output to a scope, for a simulation in simulink.
 
 We'll be able to check this register's value from ipython.
 For now, we can press run, and watch our counter iterate over the addresses.
-In our scope, if we right click, we can find ``Signals & Ports``, and set the
-Number of Input Ports to 2. 
+If we right click the scope block, then click ``Signals & Ports``, we can
+Number of Input Ports to 2.
 We can connect the either input to the bram or munge and see the data change. 
 
 
@@ -407,8 +420,9 @@ ipython session.
   import struct
   
   # bram parameters - need to match our yellow block's values
-  block_size = 128  # <bram data_width>
-  blocks = 2**13    # 2**<bram address_width>
+  block_size = 128     # <bram data_width>
+  bram_addr_width = 13 # <bram address_width>
+  blocks = 2**bram_addr_width  # number of bram blocks
   bits_per_val = 16 # <rfdc input data size> 16 bits for rfsoc4x2
   # We need our output data size to match the bram's
   # capacity so we don't fail on writes
@@ -421,6 +435,7 @@ ipython session.
   tau = dt * num_vals # Time length of bram 
   
   # Print useful info
+  print(f"bram_size = 2**{bram_addr_width}")
   print(f"fs = {fs / 1e6} MHz")
   print(f"fc = {fc / 1e6} MHz")
   
@@ -472,6 +487,12 @@ element of the bram and the first element, causing noise. Additional
 logic can reset our counter on a sample which will provide
 a smooth transition, but for this tutorial we've elected to
 keep things as simple as possible.
+327.68 MHz (``rfdc_sampling_rate`` / 6) 
+and 393.216 MHz (``rfdc sampling rate`` / 5) work well.
+
+.. image:: sine_py_plot-bram_count_rst.png
+
+Example of noise on transition from last element to first (fc = 250 MHz)
 
 Note that these sine wave data points are simply samples passed
 into our dac. In order to convert these to dBm we would
@@ -500,6 +521,7 @@ Section 3: Sending your signal out
   'sys_rev_rcs',
   'sys_scratchpad',
   'wf_bram_0',
+  'wf_len'
   'wf_en']
 
   In [10]: rfsoc.write('wf_bram_0', buf)
@@ -515,7 +537,7 @@ Your signal in a network analyzer should look something like this:
 .. image:: spectrum_output.jpg
 
 Be aware, that if ``wf_en`` is disabled, you may still have signals
-at 491.52 MHz and 245.76 MHz. Equivalent to your DAC Reference Clock and 
+at 491.52 MHz and 245.76 MHz, equivalent to your DAC Reference Clock and 
 User IP Clock Rate. Our counter controls the address data is read from. If 
 we pause our counter, we won't stop playing data, we'll play the 
 same 8 samples every clock cycle.
